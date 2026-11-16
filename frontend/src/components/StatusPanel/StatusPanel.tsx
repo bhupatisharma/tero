@@ -23,7 +23,7 @@ export default function StatusPanel({ backend, mapState, mapDetail }: StatusPane
     <section className="sidebar-section status-section" aria-labelledby="status-heading">
       <div className="section-heading">
         <div>
-          <span className="section-kicker">02 / SYSTEM</span>
+          <span className="section-kicker">03 / SYSTEM</span>
           <h2 id="status-heading">Project status</h2>
         </div>
       </div>

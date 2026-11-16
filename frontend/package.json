@@ -16,10 +16,12 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^31.0.1",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
     "vitest": "^5.1.0"

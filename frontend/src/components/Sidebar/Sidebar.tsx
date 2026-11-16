@@ -1,6 +1,7 @@
 import LayerManager from "../LayerManager/LayerManager";
+import DemUploadPanel from "./DemUploadPanel";
 import StatusPanel from "../StatusPanel/StatusPanel";
-import type { BackendHealth, GeographicCoordinates, MapState } from "../../types/api";
+import type { BackendHealth, DemMetadata, GeographicCoordinates, MapState } from "../../types/api";
 
 interface SidebarProps {
   backend: BackendHealth;
@@ -11,6 +12,20 @@ interface SidebarProps {
   cursorCoordinates: GeographicCoordinates | null;
   baseMapVisible: boolean;
   onBaseMapVisibleChange: (visible: boolean) => void;
+  dem: DemMetadata | null;
+  demUploading: boolean;
+  demProgress: number;
+  demUploadError: string;
+  demRemoveError: string;
+  onDemUpload: (file: File) => void;
+  onDemUploadCancel: () => void;
+  onDemRemove: () => void;
+  demVisible: boolean;
+  onDemVisibleChange: (visible: boolean) => void;
+  hillshadeVisible: boolean;
+  onHillshadeVisibleChange: (visible: boolean) => void;
+  hillshadeOpacity: number;
+  onHillshadeOpacityChange: (opacity: number) => void;
   isOpen: boolean;
 }
 
@@ -48,11 +63,31 @@ export default function Sidebar(props: SidebarProps) {
           <CoordinateReadout coordinates={props.cursorCoordinates} />
         </div>
       </section>
-      <LayerManager baseMapVisible={props.baseMapVisible} onBaseMapVisibleChange={props.onBaseMapVisibleChange} />
+      <LayerManager
+        baseMapVisible={props.baseMapVisible}
+        onBaseMapVisibleChange={props.onBaseMapVisibleChange}
+        dem={props.dem}
+        demVisible={props.demVisible}
+        onDemVisibleChange={props.onDemVisibleChange}
+        hillshadeVisible={props.hillshadeVisible}
+        onHillshadeVisibleChange={props.onHillshadeVisibleChange}
+        hillshadeOpacity={props.hillshadeOpacity}
+        onHillshadeOpacityChange={props.onHillshadeOpacityChange}
+      />
+      <DemUploadPanel
+        dem={props.dem}
+        isUploading={props.demUploading}
+        progress={props.demProgress}
+        uploadError={props.demUploadError}
+        removeError={props.demRemoveError}
+        onUpload={props.onDemUpload}
+        onCancelUpload={props.onDemUploadCancel}
+        onRemove={props.onDemRemove}
+      />
       <StatusPanel backend={props.backend} mapState={props.mapState} mapDetail={props.mapDetail} />
       <div className="sidebar-footer">
         <span className="footer-rule" />
-        <span>WORKSPACE / PHASE 01</span>
+        <span>WORKSPACE / PHASE 02</span>
       </div>
     </aside>
   );

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import MapView from "./components/Map/MapView";
 import Sidebar from "./components/Sidebar/Sidebar";
 import { useBackendHealth } from "./hooks/useBackendHealth";
-import type { GeographicCoordinates, MapState } from "./types/api";
+import { deleteDem, uploadDem } from "./services/api";
+import type { DemMetadata, GeographicCoordinates, MapState } from "./types/api";
 
 const DEFAULT_MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
@@ -29,7 +30,53 @@ export default function App() {
   const [selectedCoordinates, setSelectedCoordinates] = useState<GeographicCoordinates | null>(null);
   const [cursorCoordinates, setCursorCoordinates] = useState<GeographicCoordinates | null>(null);
   const [baseMapVisible, setBaseMapVisible] = useState(true);
+  const [dem, setDem] = useState<DemMetadata | null>(null);
+  const [demUploading, setDemUploading] = useState(false);
+  const [demProgress, setDemProgress] = useState(0);
+  const [demUploadError, setDemUploadError] = useState("");
+  const [demRemoveError, setDemRemoveError] = useState("");
+  const [demVisible, setDemVisible] = useState(true);
+  const [hillshadeVisible, setHillshadeVisible] = useState(true);
+  const [hillshadeOpacity, setHillshadeOpacity] = useState(0.55);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const uploadControllerRef = useRef<AbortController | null>(null);
+
+  const handleDemUpload = async (file: File) => {
+    uploadControllerRef.current?.abort();
+    const controller = new AbortController();
+    uploadControllerRef.current = controller;
+    setDemUploadError("");
+    setDemUploading(true);
+    setDemProgress(0);
+    try {
+      const uploadedDem = await uploadDem(file, controller.signal, setDemProgress);
+      const previousDem = dem;
+      setDem(uploadedDem);
+      if (previousDem) void deleteDem(previousDem.dem_id).catch(() => undefined);
+      setDemVisible(true);
+      setHillshadeVisible(true);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setDemUploadError(error instanceof Error ? error.message : "DEM upload failed.");
+      }
+    } finally {
+      if (uploadControllerRef.current === controller) {
+        uploadControllerRef.current = null;
+        setDemUploading(false);
+      }
+    }
+  };
+
+  const handleDemRemove = async () => {
+    if (!dem) return;
+    setDemRemoveError("");
+    try {
+      await deleteDem(dem.dem_id);
+      setDem(null);
+    } catch (error) {
+      setDemRemoveError(error instanceof Error ? error.message : "DEM removal failed.");
+    }
+  };
 
   const updateMapState = (state: MapState, detail = "") => {
     setMapState(state);
@@ -73,6 +120,20 @@ export default function App() {
           cursorCoordinates={cursorCoordinates}
           baseMapVisible={baseMapVisible}
           onBaseMapVisibleChange={setBaseMapVisible}
+          dem={dem}
+          demUploading={demUploading}
+          demProgress={demProgress}
+          demUploadError={demUploadError}
+          demRemoveError={demRemoveError}
+          onDemUpload={(file) => void handleDemUpload(file)}
+          onDemUploadCancel={() => uploadControllerRef.current?.abort()}
+          onDemRemove={() => void handleDemRemove()}
+          demVisible={demVisible}
+          onDemVisibleChange={setDemVisible}
+          hillshadeVisible={hillshadeVisible}
+          onHillshadeVisibleChange={setHillshadeVisible}
+          hillshadeOpacity={hillshadeOpacity}
+          onHillshadeOpacityChange={setHillshadeOpacity}
           isOpen={sidebarOpen}
         />
         <section className="map-workspace" aria-label="Map view">
@@ -80,6 +141,10 @@ export default function App() {
             styleUrl={mapStyle.url}
             configurationError={mapStyle.error}
             baseMapVisible={baseMapVisible}
+            dem={dem}
+            demVisible={demVisible}
+            hillshadeVisible={hillshadeVisible}
+            hillshadeOpacity={hillshadeOpacity}
             onMapStateChange={updateMapState}
             onZoomChange={setZoom}
             onCursorChange={setCursorCoordinates}

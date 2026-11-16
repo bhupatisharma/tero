@@ -1,11 +1,11 @@
 # Terrain-Aware Route Planning and GIS Analysis System
 
-A Phase 1 GIS application foundation: a React and TypeScript workspace with an interactive MapLibre 2D map, a base-layer control, geographic coordinate inspection, and a connected FastAPI health endpoint.
+A GIS workspace with a React and TypeScript frontend, an interactive MapLibre 2D map, GeoTIFF DEM inspection, computed hillshade, and a FastAPI backend.
 
 ## Technology
 
 - Frontend: React 19, TypeScript, Vite, MapLibre GL JS
-- Backend: Python 3.12, FastAPI, Pydantic, Uvicorn
+- Backend: Python 3.12, FastAPI, Pydantic, Rasterio, PyProj, NumPy, Pillow, Uvicorn
 - Tests: Vitest and pytest
 
 Frontend and backend dependencies are managed separately in `frontend/package.json` and `backend/requirements.txt`.
@@ -14,6 +14,7 @@ Frontend and backend dependencies are managed separately in `frontend/package.js
 
 - Node.js 22 LTS and npm
 - Python 3.12
+- Conda with conda-forge is recommended for the backend geospatial stack.
 
 ## Configure
 
@@ -36,6 +37,15 @@ Set `VITE_API_BASE_URL` to the FastAPI origin and `VITE_MAP_STYLE_URL` to a MapL
 The default style uses [OpenFreeMap Liberty](https://tiles.openfreemap.org/styles/liberty), a detailed OpenStreetMap-derived vector basemap that requires no API key. MapLibre displays the style's required attribution, including © OpenMapTiles and OpenStreetMap contributors. Review the [OpenFreeMap terms](https://openfreemap.org/tos/) before deployment; its public service currently has no SLA. Use `VITE_MAP_STYLE_URL` to select another compatible style when needed.
 
 ## Start the Backend
+
+Recommended geospatial environment, from the repository root:
+
+```sh
+conda env create -f backend/environment.yml
+conda activate terrain-gis
+```
+
+The environment uses conda-forge for Rasterio, PyProj, and their GDAL dependencies. Alternatively, use the Python virtual-environment steps below; `backend/requirements.txt` lists the matching PyPI dependencies.
 
 Create and activate a virtual environment from the repository root.
 
@@ -63,6 +73,10 @@ python -m uvicorn app.main:app --app-dir backend --reload
 
 The API is available at `http://127.0.0.1:8000`. Check `http://127.0.0.1:8000/api/health` or open the interactive API docs at `http://127.0.0.1:8000/docs`.
 
+DEM uploads accept single-band `.tif` and `.tiff` rasters that Rasterio can open. The API validates the raster contents, extracts CRS and elevation statistics, stores the original, creates a georeferenced hillshade, and serves downsampled map previews. Uploads are limited to 512 MB by default. Configure `DEM_MAX_UPLOAD_SIZE_MB` to change the limit and `DEM_STORAGE_DIR` to change the local storage directory. The default storage directory is `backend/data/dems`.
+
+The DEM endpoints are `POST /api/dem/upload`, `GET /api/dem/{dem_id}`, `GET /api/dem/{dem_id}/preview?layer=dem|hillshade`, `GET /api/dem/{dem_id}/hillshade`, and `DELETE /api/dem/{dem_id}`. A raster with missing CRS or geotransform is retained with a warning but is not placed on the map.
+
 ## Start the Frontend
 
 In a second terminal:
@@ -73,7 +87,7 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL shown in the terminal (by default `http://127.0.0.1:5173`). The app checks the API on launch and every 15 seconds. The map supports mouse drag panning, wheel/touch zoom, navigation controls, and click-to-select coordinates. Use the Layers checkbox to toggle the base map.
+Open the Vite URL shown in the terminal (by default `http://127.0.0.1:5173`). The app checks the API on launch and every 15 seconds. The map supports mouse drag panning, wheel/touch zoom, navigation controls, and click-to-select coordinates. Use the sidebar to upload a DEM, inspect its metadata, toggle its footprint/elevation preview and hillshade, and adjust hillshade opacity.
 
 ## Checks
 
@@ -96,4 +110,4 @@ GitHub Actions runs frontend and backend checks on Ubuntu and Windows. Windows i
 
 ## Scope
 
-Phase 1 does not include DEM uploads, raster/vector dataset processing, geospatial analysis, terrain rendering, or route planning. See [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for completed work, exclusions, and known limitations.
+Phase 2 provides single-band GeoTIFF ingestion, metadata and statistics, geographic coverage, a computed hillshade, and bounded map previews. Route planning, cost surfaces, constraints, multi-band DEM interpretation, and 3D terrain rendering remain out of scope. See [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for completed work and limitations.

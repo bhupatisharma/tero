@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,8 @@ APP_NAME = "Terrain-Aware Route Planning and GIS Analysis System"
 API_VERSION = "1.0.0"
 
 app = FastAPI(title=APP_NAME, version=API_VERSION)
+app.state.dem_storage_dir = Path(os.getenv("DEM_STORAGE_DIR", "backend/data/dems"))
+app.state.dem_max_upload_size = int(os.getenv("DEM_MAX_UPLOAD_SIZE_MB", "512")) * 1024 * 1024
 
 allowed_origins = [
     origin.strip()
@@ -22,7 +25,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
