@@ -1,11 +1,11 @@
-# Terrain-Aware Route Planning and GIS Analysis System
+# TERO
 
 A GIS workspace with a React and TypeScript frontend, an interactive MapLibre 2D map, GeoTIFF DEM inspection, computed hillshade, and a FastAPI backend.
 
 ## Technology
 
 - Frontend: React 19, TypeScript, Vite, MapLibre GL JS
-- Backend: Python 3.12, FastAPI, Pydantic, Rasterio, PyProj, NumPy, Pillow, Uvicorn
+- Backend: Python 3.12, FastAPI, Pydantic, Rasterio, PyProj, NumPy, Pillow, Uvicorn, GeoPandas, OSMnx, Planetary Computer STAC
 - Tests: Vitest and pytest
 
 Frontend and backend dependencies are managed separately in `frontend/package.json` and `backend/requirements.txt`.
@@ -88,6 +88,28 @@ npm run dev
 ```
 
 Open the Vite URL shown in the terminal (by default `http://127.0.0.1:5173`). The app checks the API on launch and every 15 seconds. The map supports mouse drag panning, wheel/touch zoom, navigation controls, and click-to-select coordinates. Use the sidebar to upload a DEM, inspect its metadata, toggle its footprint/elevation preview and hillshade, and adjust hillshade opacity.
+
+## Phase 3: Automatic geographical data
+
+After a georeferenced DEM upload succeeds, TERO automatically starts independent background fetches for:
+
+- **Vegetation (NDVI)** - Sentinel-2 L2A B04/B08 imagery and SCL cloud masking from Microsoft Planetary Computer STAC.
+- **Land cover** - ESA WorldCover categorical classes from Microsoft Planetary Computer.
+- **Rivers** - OpenStreetMap waterways queried and clipped with OSMnx.
+- **Water bodies** - OpenStreetMap water and wetland features queried separately with OSMnx.
+- **Roads** - OpenStreetMap highway features queried and clipped with OSMnx.
+
+The complete transformed DEM footprint, not only its corners or centre, is used for provider queries. The backend stores validated outputs under `data/fetched/{dem_id}/`, including GeoTIFF rasters, GeoJSON vector data, preview images and provenance metadata. Vector features are clipped to the DEM footprint and raster outputs use the DEM CRS and alignment.
+
+Supporting layer status is available from `GET /api/dem/{dem_id}/layers`. Individual providers can be refreshed with `POST /api/dem/{dem_id}/layers/{layer}/refresh`. Downloadable outputs are served by `GET /api/dem/{dem_id}/layers/{layer}/file`; raster previews are at `GET /api/dem/{dem_id}/layers/{layer}/preview`.
+
+Install the additional backend dependencies with:
+
+```sh
+python -m pip install -r backend/requirements.txt
+```
+
+Provider failures are isolated and shown in the TERO layer manager. Sentinel-2 searches and signed asset reads have bounded retries/timeouts, SCL masking retains only clear classes, and multi-scene NDVI medians are written in blocks through a temporary on-disk stack. OSMnx queries use the complete DEM polygon and run with a hard timeout; empty results and network errors are reported as failures. Interrupted fetches are recovered as failed instead of remaining in `processing`.
 
 ## Checks
 

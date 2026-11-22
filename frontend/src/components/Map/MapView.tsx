@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
-import { demPreviewUrl } from "../../services/api";
-import type { DemMetadata, GeographicCoordinates, MapState } from "../../types/api";
+import { demPreviewUrl, supportingLayerFileUrl, supportingLayerPreviewUrl } from "../../services/api";
+import type { DemMetadata, GeographicCoordinates, MapState, SupportingLayersResponse } from "../../types/api";
 
 setWorkerUrl(mapWorkerUrl);
 
@@ -14,6 +14,9 @@ interface MapViewProps {
   demVisible: boolean;
   hillshadeVisible: boolean;
   hillshadeOpacity: number;
+  supportingLayers: SupportingLayersResponse | null;
+  supportingVisibility: Record<string, boolean>;
+  supportingOpacity: Record<string, number>;
   onMapStateChange: (state: MapState, detail?: string) => void;
   onZoomChange: (zoom: number) => void;
   onCursorChange: (coordinates: GeographicCoordinates | null) => void;
@@ -35,6 +38,75 @@ function removeDemLayers(map: MapLibreMap) {
   }
   for (const sourceId of ["hillshade-image", "dem-image", "dem-footprint-data"]) {
     if (map.getSource(sourceId)) map.removeSource(sourceId);
+  }
+}
+
+function removeSupportingLayers(map: MapLibreMap) {
+  const layerIds = ["vegetation-raster", "landcover-raster", "rivers-line", "water-bodies-fill", "roads-line"];
+  const sourceIds = ["vegetation-image", "landcover-image", "rivers-data", "water-bodies-data", "roads-data"];
+  for (const layerId of layerIds) if (map.getLayer(layerId)) map.removeLayer(layerId);
+  for (const sourceId of sourceIds) if (map.getSource(sourceId)) map.removeSource(sourceId);
+}
+
+function addSupportingLayers(
+  map: MapLibreMap,
+  dem: DemMetadata | null,
+  response: SupportingLayersResponse | null,
+  visibility: Record<string, boolean>,
+  opacity: Record<string, number>,
+) {
+  removeSupportingLayers(map);
+  if (!dem?.geographic_bounds || !response) return;
+  const bounds = dem.geographic_bounds;
+  const coordinates: [[number, number], [number, number], [number, number], [number, number]] = [
+    [bounds.west, bounds.north],
+    [bounds.east, bounds.north],
+    [bounds.east, bounds.south],
+    [bounds.west, bounds.south],
+  ];
+  for (const name of ["vegetation", "landcover"] as const) {
+    const layer = response.layers[name];
+    if (layer?.status !== "available") continue;
+    map.addSource(`${name}-image`, {
+      type: "image",
+      url: supportingLayerPreviewUrl(dem.dem_id, name),
+      coordinates,
+    });
+    map.addLayer({
+      id: `${name}-raster`,
+      type: "raster",
+      source: `${name}-image`,
+      layout: { visibility: visibility[name] ? "visible" : "none" },
+      paint: { "raster-opacity": opacity[name] ?? 0.7, "raster-resampling": "nearest" },
+    });
+  }
+  for (const [name, type] of [
+    ["rivers", "line"],
+    ["water_bodies", "fill"],
+    ["roads", "line"],
+  ] as const) {
+    const layer = response.layers[name];
+    if (layer?.status !== "available") continue;
+    const sourceId = name === "water_bodies" ? "water-bodies-data" : `${name}-data`;
+    const layerId = name === "water_bodies" ? "water-bodies-fill" : name === "roads" ? "roads-line" : "rivers-line";
+    map.addSource(sourceId, { type: "geojson", data: supportingLayerFileUrl(dem.dem_id, name) });
+    if (type === "fill") {
+      map.addLayer({
+        id: layerId,
+        type: "fill",
+        source: sourceId,
+        layout: { visibility: visibility[name] ? "visible" : "none" },
+        paint: { "fill-color": "#4ea3db", "fill-opacity": opacity[name] ?? 0.75, "fill-outline-color": "#1f78b4" },
+      });
+    } else {
+      map.addLayer({
+        id: layerId,
+        type: "line",
+        source: sourceId,
+        layout: { visibility: visibility[name] ? "visible" : "none" },
+        paint: { "line-color": name === "roads" ? "#e0a23a" : "#2b79c9", "line-width": name === "roads" ? 2.5 : 2, "line-opacity": opacity[name] ?? 0.9 },
+      });
+    }
   }
 }
 
@@ -123,6 +195,9 @@ export default function MapView({
   demVisible,
   hillshadeVisible,
   hillshadeOpacity,
+  supportingLayers,
+  supportingVisibility,
+  supportingOpacity,
   onMapStateChange,
   onZoomChange,
   onCursorChange,
@@ -136,6 +211,9 @@ export default function MapView({
   const demVisibleRef = useRef(demVisible);
   const hillshadeVisibleRef = useRef(hillshadeVisible);
   const hillshadeOpacityRef = useRef(hillshadeOpacity);
+  const supportingLayersRef = useRef(supportingLayers);
+  const supportingVisibilityRef = useRef(supportingVisibility);
+  const supportingOpacityRef = useRef(supportingOpacity);
   const styleLoadedRef = useRef(false);
   const callbacksRef = useRef({ onMapStateChange, onZoomChange, onCursorChange, onLocationSelect });
 
@@ -148,7 +226,10 @@ export default function MapView({
     demVisibleRef.current = demVisible;
     hillshadeVisibleRef.current = hillshadeVisible;
     hillshadeOpacityRef.current = hillshadeOpacity;
-  }, [dem, demVisible, hillshadeVisible, hillshadeOpacity]);
+    supportingLayersRef.current = supportingLayers;
+    supportingVisibilityRef.current = supportingVisibility;
+    supportingOpacityRef.current = supportingOpacity;
+  }, [dem, demVisible, hillshadeVisible, hillshadeOpacity, supportingLayers, supportingVisibility, supportingOpacity]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -187,6 +268,7 @@ export default function MapView({
       styleLoadedRef.current = true;
       setBaseMapVisibility(map, baseMapVisibleRef.current);
       addDemLayers(map, demRef.current);
+      addSupportingLayers(map, demRef.current, supportingLayersRef.current, supportingVisibilityRef.current, supportingOpacityRef.current);
       applyDemVisibility(map, demVisibleRef.current, hillshadeVisibleRef.current, hillshadeOpacityRef.current);
       callbacksRef.current.onMapStateChange("ready");
       callbacksRef.current.onZoomChange(map.getZoom());
@@ -243,6 +325,12 @@ export default function MapView({
     addDemLayers(map, dem);
     applyDemVisibility(map, demVisible, hillshadeVisible, hillshadeOpacity);
   }, [dem]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleLoadedRef.current) return;
+    addSupportingLayers(map, dem, supportingLayers, supportingVisibility, supportingOpacity);
+  }, [dem, supportingLayers, supportingVisibility, supportingOpacity]);
 
   useEffect(() => {
     const map = mapRef.current;

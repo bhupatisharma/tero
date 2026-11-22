@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MapView from "./components/Map/MapView";
 import Sidebar from "./components/Sidebar/Sidebar";
 import { useBackendHealth } from "./hooks/useBackendHealth";
-import { deleteDem, uploadDem } from "./services/api";
-import type { DemMetadata, GeographicCoordinates, MapState } from "./types/api";
+import { deleteDem, fetchSupportingLayers, uploadDem } from "./services/api";
+import type { DemMetadata, GeographicCoordinates, MapState, SupportingLayersResponse } from "./types/api";
 
 const DEFAULT_MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
@@ -38,8 +38,47 @@ export default function App() {
   const [demVisible, setDemVisible] = useState(true);
   const [hillshadeVisible, setHillshadeVisible] = useState(true);
   const [hillshadeOpacity, setHillshadeOpacity] = useState(0.55);
+  const [supportingLayers, setSupportingLayers] = useState<SupportingLayersResponse | null>(null);
+  const [supportingVisibility, setSupportingVisibility] = useState<Record<string, boolean>>({
+    vegetation: true,
+    landcover: true,
+    rivers: true,
+    water_bodies: true,
+    roads: true,
+  });
+  const [supportingOpacity, setSupportingOpacity] = useState<Record<string, number>>({
+    vegetation: 0.75,
+    landcover: 0.65,
+    rivers: 0.9,
+    water_bodies: 0.75,
+    roads: 0.9,
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const uploadControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!dem) {
+      setSupportingLayers(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const result = await fetchSupportingLayers(dem.dem_id);
+        if (!cancelled) setSupportingLayers(result);
+      } catch {
+        if (!cancelled) setSupportingLayers(null);
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => {
+      void poll();
+    }, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [dem]);
 
   const handleDemUpload = async (file: File) => {
     uploadControllerRef.current?.abort();
@@ -98,7 +137,7 @@ export default function App() {
           </button>
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <div className="brand-text">
-            <strong>Terrain Planner</strong>
+            <strong>TERO</strong>
             <span>GIS ANALYSIS WORKSPACE</span>
           </div>
         </div>
@@ -134,6 +173,15 @@ export default function App() {
           onHillshadeVisibleChange={setHillshadeVisible}
           hillshadeOpacity={hillshadeOpacity}
           onHillshadeOpacityChange={setHillshadeOpacity}
+          supportingLayers={supportingLayers}
+          supportingVisibility={supportingVisibility}
+          onSupportingVisibilityChange={(name, visible) =>
+            setSupportingVisibility((current) => ({ ...current, [name]: visible }))
+          }
+          supportingOpacity={supportingOpacity}
+          onSupportingOpacityChange={(name, opacity) =>
+            setSupportingOpacity((current) => ({ ...current, [name]: opacity }))
+          }
           isOpen={sidebarOpen}
         />
         <section className="map-workspace" aria-label="Map view">
@@ -145,6 +193,9 @@ export default function App() {
             demVisible={demVisible}
             hillshadeVisible={hillshadeVisible}
             hillshadeOpacity={hillshadeOpacity}
+            supportingLayers={supportingLayers}
+            supportingVisibility={supportingVisibility}
+            supportingOpacity={supportingOpacity}
             onMapStateChange={updateMapState}
             onZoomChange={setZoom}
             onCursorChange={setCursorCoordinates}

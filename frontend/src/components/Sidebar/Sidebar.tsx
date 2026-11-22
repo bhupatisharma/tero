@@ -1,7 +1,7 @@
 import LayerManager from "../LayerManager/LayerManager";
 import DemUploadPanel from "./DemUploadPanel";
 import StatusPanel from "../StatusPanel/StatusPanel";
-import type { BackendHealth, DemMetadata, GeographicCoordinates, MapState } from "../../types/api";
+import type { BackendHealth, DemMetadata, GeographicCoordinates, MapState, SupportingLayersResponse } from "../../types/api";
 
 interface SidebarProps {
   backend: BackendHealth;
@@ -26,6 +26,11 @@ interface SidebarProps {
   onHillshadeVisibleChange: (visible: boolean) => void;
   hillshadeOpacity: number;
   onHillshadeOpacityChange: (opacity: number) => void;
+  supportingLayers: SupportingLayersResponse | null;
+  supportingVisibility: Record<string, boolean>;
+  onSupportingVisibilityChange: (name: string, visible: boolean) => void;
+  supportingOpacity: Record<string, number>;
+  onSupportingOpacityChange: (name: string, opacity: number) => void;
   isOpen: boolean;
 }
 
@@ -73,6 +78,11 @@ export default function Sidebar(props: SidebarProps) {
         onHillshadeVisibleChange={props.onHillshadeVisibleChange}
         hillshadeOpacity={props.hillshadeOpacity}
         onHillshadeOpacityChange={props.onHillshadeOpacityChange}
+        supportingLayers={props.supportingLayers}
+        supportingVisibility={props.supportingVisibility}
+        onSupportingVisibilityChange={props.onSupportingVisibilityChange}
+        supportingOpacity={props.supportingOpacity}
+        onSupportingOpacityChange={props.onSupportingOpacityChange}
       />
       <DemUploadPanel
         dem={props.dem}
@@ -87,7 +97,7 @@ export default function Sidebar(props: SidebarProps) {
       <StatusPanel backend={props.backend} mapState={props.mapState} mapDetail={props.mapDetail} />
       <div className="sidebar-footer">
         <span className="footer-rule" />
-        <span>WORKSPACE / PHASE 02</span>
+        <span>TERO / GEOGRAPHICAL DATA / PHASE 03</span>
       </div>
     </aside>
   );

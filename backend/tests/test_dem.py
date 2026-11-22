@@ -37,6 +37,7 @@ def create_client(tmp_path, monkeypatch) -> TestClient:
     app.state.dem_storage_dir = tmp_path / "dems"
     app.state.dem_storage_dir.mkdir()
     app.state.dem_max_upload_size = 1024 * 1024
+    monkeypatch.setattr("app.api.routes.dem.start_layer_fetches", lambda _: None)
     return TestClient(app)
 
 

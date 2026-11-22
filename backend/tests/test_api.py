@@ -11,7 +11,7 @@ def test_health_endpoint_returns_structured_status() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "application": "Terrain-Aware Route Planning and GIS Analysis System",
+        "application": "TERO",
         "api_version": "1.0.0",
     }
 

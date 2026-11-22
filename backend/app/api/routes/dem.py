@@ -7,8 +7,10 @@ from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
-from app.models import DemMetadata
+from app.models import DemMetadata, SupportingLayerStatus, SupportingLayersResponse
 from app.services.dem_processing import DemProcessingError, load_metadata, process_dem
+from app.services.layer_cache import LAYER_FILES, fetched_directory, initialize_status, load_status
+from app.services.layer_orchestration import fetch_one_layer, start_layer_fetches
 
 router = APIRouter(prefix="/dem", tags=["dem"])
 DEM_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
@@ -48,9 +50,11 @@ async def upload_dem(request: Request, file: UploadFile) -> DemMetadata:
         if size == 0:
             raise HTTPException(status_code=400, detail="The uploaded file is empty.")
 
-        return await run_in_threadpool(
+        metadata = await run_in_threadpool(
             process_dem, dem_id, file_name, original_path, size, directory
         )
+        await run_in_threadpool(start_layer_fetches, directory)
+        return metadata
     except DemProcessingError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except HTTPException:
@@ -92,6 +96,60 @@ def get_hillshade(request: Request, dem_id: str) -> FileResponse:
     return FileResponse(hillshade, media_type="image/tiff", filename="hillshade.tif")
 
 
+@router.get("/{dem_id}/layers", response_model=SupportingLayersResponse)
+def get_supporting_layers(request: Request, dem_id: str) -> SupportingLayersResponse:
+    directory = _dem_directory(request, dem_id)
+    status = initialize_status(directory)
+    layers = {}
+    for name, values in status.items():
+        values = dict(values)
+        values["name"] = name
+        layers[name] = SupportingLayerStatus.model_validate(values)
+    return SupportingLayersResponse(dem_id=dem_id, layers=layers)
+
+
+@router.post("/{dem_id}/layers/{layer}/refresh", response_model=SupportingLayerStatus)
+async def refresh_supporting_layer(request: Request, dem_id: str, layer: str) -> SupportingLayerStatus:
+    directory = _dem_directory(request, dem_id)
+    if layer not in LAYER_FILES:
+        raise HTTPException(status_code=404, detail="Supporting layer not found.")
+    await run_in_threadpool(fetch_one_layer, directory, layer, True)
+    values = load_status(directory).get(layer, {})
+    values = dict(values)
+    values["name"] = layer
+    return SupportingLayerStatus.model_validate(values)
+
+
+@router.get("/{dem_id}/layers/{layer}/file")
+def get_supporting_layer_file(request: Request, dem_id: str, layer: str) -> FileResponse:
+    directory = _dem_directory(request, dem_id)
+    if layer not in LAYER_FILES:
+        raise HTTPException(status_code=404, detail="Supporting layer not found.")
+    status = load_status(directory)
+    if status.get(layer, {}).get("status") != "available":
+        raise HTTPException(status_code=409, detail="Supporting layer is not available.")
+    path = fetched_directory(directory) / LAYER_FILES[layer]
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Supporting layer file is unavailable.")
+    media_type = "image/tiff" if path.suffix == ".tif" else "application/geo+json"
+    return FileResponse(path, media_type=media_type, filename=path.name)
+
+
+@router.get("/{dem_id}/layers/{layer}/preview")
+def get_supporting_layer_preview(request: Request, dem_id: str, layer: str) -> FileResponse:
+    directory = _dem_directory(request, dem_id)
+    if layer not in {"vegetation", "landcover"}:
+        raise HTTPException(status_code=404, detail="This layer has no raster preview.")
+    status = load_status(directory)
+    if status.get(layer, {}).get("status") != "available":
+        raise HTTPException(status_code=409, detail="Supporting layer is not available.")
+    raster = fetched_directory(directory) / LAYER_FILES[layer]
+    preview = raster.with_suffix(".preview.png")
+    if not preview.is_file():
+        raise HTTPException(status_code=404, detail="Raster preview is unavailable.")
+    return FileResponse(preview, media_type="image/png", filename=preview.name)
+
+  
 @router.delete("/{dem_id}", status_code=204)
 def delete_dem(request: Request, dem_id: str) -> None:
     directory = _dem_directory(request, dem_id)

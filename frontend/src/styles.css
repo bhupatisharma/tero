@@ -79,6 +79,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid #d85d3e; outline-
 .opacity-control { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 8px 0 0 37px; color: #777b73; font-size: 9px; }
 .opacity-control output { color: #465348; font: 9px var(--mono); }
 .opacity-control input { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--green); cursor: pointer; }
+.supporting-layer { padding: 4px 0 8px; border-top: 1px solid #ecece4; }
+.layer-swatch--vegetation { background: linear-gradient(135deg, #d7e59b, #4c9a55 55%, #164f32); }
+.layer-swatch--landcover { background: linear-gradient(135deg, #63a65a 0 20%, #d4c79a 20 40%, #6b8ba4 40 60%, #d8d8d8 60 80%, #b68a61 80); }
+.layer-swatch--rivers { background: linear-gradient(135deg, #d8eef8, #2b79c9); }
+.layer-swatch--water_bodies { background: linear-gradient(135deg, #e2f3fb, #4ea3db); }
+.layer-swatch--roads { background: repeating-linear-gradient(135deg, #f1d69a 0 5px, #d29a42 5px 8px); }
+.layer-metadata { display: grid; gap: 3px; margin: 4px 0 6px 37px; color: #777b73; font-size: 9px; }
+.layer-metadata summary { cursor: pointer; color: #465348; }
+.layer-refresh { margin: 4px 0 0 37px; border: 1px solid #c9ccc1; border-radius: 4px; background: #faf9f4; color: #465348; font-size: 9px; padding: 5px 8px; cursor: pointer; }
 .layer-empty { margin-top: 14px; padding: 17px 10px 15px; border: 1px dashed #d3d4ca; border-radius: 5px; text-align: center; background: #f8f7f1; }
 .empty-mark { width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 50%; color: #81877d; border: 1px solid #c9ccc1; font: 15px var(--mono); }
 .layer-empty p { margin: 9px 0 5px; color: #4a514a; font-size: 10px; font-weight: 600; }

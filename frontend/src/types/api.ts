@@ -56,3 +56,26 @@ export interface DemMetadata {
   processing_status: "ready" | "warning";
   warning: string | null;
 }
+
+export type SupportingLayerStatusName =
+  | "pending" | "fetching" | "processing" | "available" | "partial" | "unavailable" | "failed";
+
+export interface SupportingLayerStatus {
+  name: string;
+  status: SupportingLayerStatusName;
+  source: string;
+  licence?: string | null;
+  fetched_at?: string | null;
+  crs?: string | null;
+  bounds?: number[] | null;
+  feature_count?: number | null;
+  scene_count?: number | null;
+  file_name?: string | null;
+  metadata?: Record<string, unknown> | null;
+  error?: string | null;
+}
+
+export interface SupportingLayersResponse {
+  dem_id: string;
+  layers: Record<string, SupportingLayerStatus>;
+}

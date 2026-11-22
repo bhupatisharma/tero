@@ -3,12 +3,12 @@ from pydantic import BaseModel
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    application: str = "Terrain-Aware Route Planning and GIS Analysis System"
+    application: str = "TERO"
     api_version: str = "1.0.0"
 
 
 class ApiInfoResponse(BaseModel):
-    application: str = "Terrain-Aware Route Planning and GIS Analysis System"
+    application: str = "TERO"
     api_version: str = "1.0.0"
     docs_url: str = "/docs"
 
@@ -59,3 +59,23 @@ class DemMetadata(BaseModel):
     geographic_coverage: str | None = None
     processing_status: str
     warning: str | None = None
+
+
+class SupportingLayerStatus(BaseModel):
+    name: str
+    status: str
+    source: str
+    licence: str | None = None
+    fetched_at: str | None = None
+    crs: str | None = None
+    bounds: list[float] | None = None
+    feature_count: int | None = None
+    scene_count: int | None = None
+    file_name: str | None = None
+    metadata: dict | None = None
+    error: str | None = None
+
+
+class SupportingLayersResponse(BaseModel):
+    dem_id: str
+    layers: dict[str, SupportingLayerStatus]

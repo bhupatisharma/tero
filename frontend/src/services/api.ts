@@ -1,4 +1,4 @@
-import type { DemMetadata, HealthResponse } from "../types/api";
+import type { DemMetadata, HealthResponse, SupportingLayerStatus, SupportingLayersResponse } from "../types/api";
 
 const DEFAULT_API_URL = "http://127.0.0.1:8000";
 
@@ -128,4 +128,29 @@ export async function deleteDem(demId: string): Promise<void> {
 
 export function demPreviewUrl(demId: string, layer: "dem" | "hillshade"): string {
   return `${API_BASE_URL}/api/dem/${encodeURIComponent(demId)}/preview?layer=${layer}`;
+}
+
+export async function fetchSupportingLayers(demId: string): Promise<SupportingLayersResponse> {
+  if (apiConfigurationError) throw new Error(apiConfigurationError);
+  const response = await fetch(`${API_BASE_URL}/api/dem/${encodeURIComponent(demId)}/layers`);
+  if (!response.ok) throw new Error(`Could not load supporting layer status (HTTP ${response.status}).`);
+  return await response.json() as SupportingLayersResponse;
+}
+
+export async function refreshSupportingLayer(demId: string, layer: string): Promise<SupportingLayerStatus> {
+  if (apiConfigurationError) throw new Error(apiConfigurationError);
+  const response = await fetch(
+    `${API_BASE_URL}/api/dem/${encodeURIComponent(demId)}/layers/${encodeURIComponent(layer)}/refresh`,
+    { method: "POST" },
+  );
+  if (!response.ok) throw new Error(`Could not refresh supporting layer (HTTP ${response.status}).`);
+  return await response.json() as SupportingLayerStatus;
+}
+
+export function supportingLayerFileUrl(demId: string, layer: string): string {
+  return `${API_BASE_URL}/api/dem/${encodeURIComponent(demId)}/layers/${encodeURIComponent(layer)}/file`;
+}
+
+export function supportingLayerPreviewUrl(demId: string, layer: "vegetation" | "landcover"): string {
+  return `${API_BASE_URL}/api/dem/${encodeURIComponent(demId)}/layers/${encodeURIComponent(layer)}/preview`;
 }

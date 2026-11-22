@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.models import ApiInfoResponse
 
-APP_NAME = "Terrain-Aware Route Planning and GIS Analysis System"
+APP_NAME = "TERO"
 API_VERSION = "1.0.0"
 
 app = FastAPI(title=APP_NAME, version=API_VERSION)
