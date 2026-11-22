@@ -1,4 +1,4 @@
-# MASTER PROJECT SPECIFICATION
+# MASTER PROJECT SPECIFICATION (REVISED)
 # TERRAIN-AWARE ROUTE PLANNING AND GIS ANALYSIS SYSTEM
 
 ## 1. PROJECT OVERVIEW
@@ -7,7 +7,7 @@
 
 Develop a modular, interactive, GIS-based Terrain-Aware Route Planning System.
 
-The application will allow users to upload Digital Elevation Models (DEMs), load additional geographical datasets, analyse terrain characteristics, generate a combined weighted cost map, select geographical start and destination points, and calculate routes based on terrain and user-defined geographical constraints.
+The application will allow users to upload Digital Elevation Models (DEMs), automatically fetch additional geographical datasets from public sources, analyse terrain characteristics, generate a combined weighted cost map, select geographical start and destination points, and calculate routes based on terrain and user-defined geographical constraints.
 
 The system should provide multiple route alternatives, detailed route statistics, interactive 2D mapping, and 3D terrain visualisation.
 
@@ -18,23 +18,24 @@ The application must be designed iteratively, with each feature implemented, tes
 1. Accept user-uploaded DEM files.
 2. Automatically read and interpret geospatial metadata.
 3. Correctly position uploaded geographical data on an interactive world map.
-4. Support multiple geographical data layers.
-5. Combine terrain and environmental information into a cost surface.
-6. Allow users to dynamically configure the weights of supported cost factors.
-7. Allow users to select start and destination points directly on the map.
-8. Generate routes using the A* algorithm.
-9. Support general user-defined geographical restrictions.
-10. Generate multiple alternative routes.
-11. Compare route lengths, costs, elevation and terrain characteristics.
-12. Display results in both 2D and 3D.
-13. Support large geographical datasets as far as available hardware permits.
-14. Work on both Linux and Windows.
+4. Automatically fetch supporting geographical data layers (vegetation, land-cover, rivers, water bodies, roads) from public geospatial data services based on the DEM's geographical coverage.
+5. Support multiple geographical data layers.
+6. Combine terrain and environmental information into a cost surface.
+7. Allow users to dynamically configure the weights of supported cost factors.
+8. Allow users to select start and destination points directly on the map.
+9. Generate routes using the A* algorithm.
+10. Support general user-defined geographical restrictions.
+11. Generate multiple alternative routes.
+12. Compare route lengths, costs, elevation and terrain characteristics.
+13. Display results in both 2D and 3D.
+14. Support large geographical datasets as far as available hardware permits.
+15. Work on both Linux and Windows.
 
 ### 1.3 Intended application
 
 The application is a general-purpose terrain-aware GIS analysis and route-planning platform.
 
-It should be modular enough to support different geographical analysis scenarios without being tied to one particular dataset or geographical location.
+It should be modular enough to support different geographical analysis scenarios without being tied to one particular dataset or geographical location. Supporting geographical layers are not manually uploaded by the user but are retrieved automatically from public data sources for the region covered by the uploaded DEM.
 
 ---
 
@@ -90,7 +91,7 @@ Features:
 - Pan around the map.
 - Display latitude and longitude.
 - Display coordinates when clicking the map.
-- Display uploaded geographical datasets.
+- Display uploaded and fetched geographical datasets.
 - Toggle individual layers.
 - Control layer opacity.
 - Display geographical boundaries.
@@ -100,34 +101,37 @@ Features:
 - Display legends for raster layers.
 - Support different base-map styles where available.
 
-The map should remain responsive when datasets are uploaded or changed.
+The map should remain responsive when datasets are fetched or changed.
 
 ## 2.3 GEOGRAPHICAL DATA LAYERS
 
-The application should support multiple geographical datasets.
+The application should support multiple geographical datasets. The user does not upload supporting datasets manually; instead, after a DEM is loaded, the application automatically determines the DEM's geographical extent and retrieves the relevant supporting datasets from public geospatial data services.
 
 Initial required layers:
 
-1. DEM / elevation data.
-2. Vegetation data.
-3. Land-cover data.
-4. River data.
-5. Water-body data.
-6. Road-network data.
-7. Derived slope data.
-8. Derived hillshade data.
+1. DEM / elevation data — user-uploaded.
+2. Vegetation data — automatically fetched.
+3. Land-cover data — automatically fetched.
+4. River data — automatically fetched.
+5. Water-body data — automatically fetched.
+6. Road-network data — automatically fetched.
+7. Derived slope data — computed from the DEM.
+8. Derived hillshade data — computed from the DEM.
 
 Each layer should be independently managed.
 
 Required functionality:
-- Upload a dataset.
-- Read its metadata.
-- Display it on the map.
+- Upload a DEM dataset.
+- Automatically fetch supporting datasets for the DEM's coverage.
+- Read the metadata of each fetched or derived dataset.
+- Display each dataset on the map.
 - Enable or disable visibility.
 - Adjust opacity.
-- Inspect its properties.
-- Remove it from the current project.
-- Check whether it covers the selected geographical region.
+- Inspect properties.
+- Remove a layer from the current project.
+- Check whether each fetched dataset covers the selected geographical region.
+- Re-fetch datasets when the DEM coverage changes.
+- Allow manual refresh of automatically fetched layers.
 
 Support raster and vector data separately.
 
@@ -136,6 +140,35 @@ Initial formats:
 - GeoJSON for vector datasets.
 
 Additional formats may be introduced later.
+
+### 2.3.1 AUTOMATIC GEOGRAPHICAL DATA FETCHING
+
+The application must automatically obtain the supporting geographical layers for the DEM's area of interest. The user is not required to upload vegetation, land-cover, river, water-body, or road datasets.
+
+For each supported layer type, the application should:
+
+1. Determine the geographic bounding box of the loaded DEM (reprojected to WGS84 for querying).
+2. Query an appropriate public geospatial data source using that bounding box.
+3. Download or stream the relevant data for the requested region.
+4. Validate and reproject the fetched data to a common analysis CRS.
+5. Add the result as a managed layer in the project.
+
+Candidate public data sources should be selected based on reliability, licensing, and global coverage. Examples to investigate include (but are not limited to):
+
+- Vegetation and land-cover: Copernicus Global Land Service, ESA WorldCover, MODIS land-cover products, or equivalent open datasets.
+- Rivers and water bodies: OpenStreetMap (via Overpass API), HydroSHEDS, HydroATLAS, or equivalent open hydrological datasets.
+- Road networks: OpenStreetMap (via Overpass API), or equivalent open road datasets.
+
+Additional sources may be added later behind a provider abstraction.
+
+Important considerations:
+- Data source availability, rate limits, and licensing must be documented.
+- The system must degrade gracefully if a source is unavailable: the layer is marked as unavailable, the user is informed, and the corresponding cost factor is treated as inactive.
+- Fetched data must be cached locally per-DEM (or per-region) to avoid repeated large downloads.
+- The user should be able to see which source was used, what the fetch status is, and when the data was last updated.
+- Fetch operations should show progress and handle errors (network failures, timeouts, empty responses, partial coverage).
+- Large responses should be handled without freezing the UI; the backend should perform the fetching asynchronously or via background tasks.
+- The system must not claim that fetched data is authoritative for any safety-critical use; it is an aid for analysis only.
 
 ## 2.4 GEOSPATIAL DATA PROCESSING
 
@@ -159,6 +192,7 @@ Required functionality:
 - Extent validation.
 - Resolution validation.
 - Common analysis-grid generation.
+- Handling of fetched datasets that only partially cover the DEM extent.
 
 Select an appropriate reference grid for analysis.
 
@@ -201,7 +235,7 @@ Where:
 - V = vegetation-related cost.
 - L = land-cover-related cost.
 - H = environmental hazard-related cost.
-- w = user-defined weight.
+- w = user-defined weights.
 
 The actual model must be documented and implemented consistently.
 
@@ -216,9 +250,9 @@ The interface should provide:
 
 Changing a weight must update the combined cost surface and subsequent route calculations.
 
-Keep individual cost layers separate so that they can be recalculated without re-uploading the original datasets.
+Keep individual cost layers separate so that they can be recalculated without re-fetching or re-uploading the original datasets.
 
-Define appropriate behaviour for missing or unavailable layers.
+Define appropriate behaviour for missing or unavailable layers (e.g., a layer whose automatic fetch failed, or a layer with incomplete coverage over the analysis region). Such factors should be disabled by default and clearly marked as unavailable.
 
 ## 2.6 START AND DESTINATION SELECTION
 
@@ -300,7 +334,7 @@ Validate start and destination points against active hard restrictions.
 
 Provide appropriate warnings when a route cannot be calculated because of conflicting constraints.
 
-Keep the restriction module independent from the original uploaded datasets and base cost layers.
+Keep the restriction module independent from the original uploaded datasets, fetched layers and base cost layers.
 
 ## 2.9 MULTIPLE ALTERNATIVE ROUTES
 
@@ -353,7 +387,7 @@ Provide both 2D and 3D map interfaces.
 2D:
 - Interactive map.
 - DEM coverage.
-- Geographical layers.
+- Fetched geographical layers.
 - Cost-map overlay.
 - Start and destination markers.
 - Generated routes.
@@ -388,6 +422,8 @@ Allow users to save and reopen their analysis projects.
 Store:
 - Project configuration.
 - Uploaded dataset references.
+- References and metadata for automatically fetched layers.
+- Fetch status, source, and timestamps for fetched layers.
 - Dataset metadata.
 - Layer visibility settings.
 - Cost-factor configuration.
@@ -401,8 +437,9 @@ Support:
 - Export route statistics.
 - Save project configuration.
 - Reopen saved projects.
+- Re-fetch or refresh fetched layers as needed.
 
-Avoid embedding unnecessarily large raster files inside project configuration files. Store dataset references and metadata separately.
+Avoid embedding unnecessarily large raster files inside project configuration files. Store dataset references, fetch metadata, and source URLs separately so that the datasets can be re-obtained when a project is reopened.
 
 ---
 
@@ -445,12 +482,14 @@ CesiumJS:
 Python 3.12:
 - Main backend language.
 - Geospatial processing.
+- Data fetching from public sources.
 - Cost calculations.
 - Routing implementation.
 
 FastAPI:
 - API framework.
 - Upload endpoints.
+- Fetch endpoints for supporting layers.
 - Processing endpoints.
 - Route calculation endpoints.
 - Project management endpoints.
@@ -461,6 +500,9 @@ Uvicorn:
 Pydantic:
 - Data validation.
 - API request and response models.
+
+HTTP client:
+- Requests or httpx for querying public geospatial data services.
 
 ## 3.3 GEOSPATIAL PROCESSING
 
@@ -506,9 +548,20 @@ Python implementation of:
 - Grid-based graph representation.
 - Alternative-route generation.
 
-Keep the routing algorithm separate from the GIS upload and visualisation code.
+Keep the routing algorithm separate from the GIS upload, fetching, and visualisation code.
 
-## 3.6 TESTING
+## 3.6 DATA FETCHING
+
+Use a dedicated backend module for retrieving supporting geographical layers from public sources.
+
+Initial approach:
+- Query sources by bounding box derived from the DEM coverage.
+- Use HTTP APIs or data downloads where available.
+- Cache results locally.
+- Record provenance (source name, URL, request parameters, timestamp).
+- Allow sources to be abstracted behind a provider interface so additional providers can be added.
+
+## 3.7 TESTING
 
 Backend:
 - Pytest.
@@ -521,7 +574,7 @@ Cross-platform:
 - GitHub Actions.
 - Linux and Windows CI environments.
 
-## 3.7 DATA FORMATS
+## 3.8 DATA FORMATS
 
 Initial supported formats:
 - GeoTIFF for raster data.
@@ -570,6 +623,7 @@ dependencies:
   - shapely
   - pyproj
   - pandas
+  - httpx
   - pip
   - pip:
       - fastapi
@@ -595,8 +649,8 @@ Use a modular frontend/backend architecture.
 Frontend responsibilities:
 - User interface.
 - Map interactions.
-- Dataset upload interface.
-- Layer controls.
+- DEM upload interface.
+- Layer controls (including fetching status and refresh for auto-fetched layers).
 - Cost configuration.
 - Route selection.
 - Results presentation.
@@ -609,6 +663,8 @@ Backend responsibilities:
 - Coordinate transformations.
 - Raster processing.
 - Vector processing.
+- Fetching of supporting geographical layers from public data sources.
+- Caching of fetched layers.
 - Cost-map generation.
 - Route calculation.
 - Route statistics.
@@ -622,11 +678,12 @@ Keep the following modules separate:
 3. Coordinate-transformation module.
 4. Raster-processing module.
 5. Vector-processing module.
-6. Cost-map module.
-7. Routing module.
-8. Constraint-management module.
-9. Route-statistics module.
-10. Project-management module.
+6. Data-fetching / data-provider module.
+7. Cost-map module.
+8. Routing module.
+9. Constraint-management module.
+10. Route-statistics module.
+11. Project-management module.
 
 The frontend should not perform heavy raster calculations.
 
@@ -656,7 +713,7 @@ A later phase must not break functionality completed in an earlier phase.
 
 ---
 
-## PHASE 1 — PROJECT SETUP AND BASIC MAP INTERFACE
+## PHASE 1 — PROJECT SETUP AND BASIC MAP INTERFACE (COMPLETE)
 
 ### Objective
 
@@ -695,7 +752,7 @@ A working browser application with an interactive 2D map and a functioning backe
 
 ---
 
-## PHASE 2 — DEM UPLOAD AND GEOSPATIAL RECOGNITION
+## PHASE 2 — DEM UPLOAD AND GEOSPATIAL RECOGNITION (COMPLETE)
 
 ### Objective
 
@@ -732,34 +789,45 @@ This is the first major project milestone.
 
 ---
 
-## PHASE 3 — GEOGRAPHICAL DATA LAYERS
+## PHASE 3 — AUTOMATIC GEOGRAPHICAL DATA FETCHING AND LAYER MANAGEMENT
 
 ### Objective
 
-Allow users to upload and manage supporting geographical datasets.
+Automatically obtain supporting geographical datasets for the DEM's area of interest and manage them as map layers.
 
 ### Features
 
-1. Vegetation data upload.
-2. Land-cover data upload.
-3. River data upload.
-4. Water-body data upload.
-5. Road-network data upload.
-6. Vector data upload.
-7. Raster data upload.
-8. Individual layer visibility.
-9. Layer opacity controls.
-10. Layer metadata.
-11. CRS validation.
-12. Dataset extent validation.
-13. Coordinate reprojection.
-14. Initial raster/vector alignment.
-15. Layer removal.
-16. Layer status display.
+1. Compute the DEM's geographic bounding box (in WGS84) for querying.
+2. Implement a data-provider module that abstracts public geospatial data sources.
+3. Implement fetchers for:
+   - Vegetation data.
+   - Land-cover data.
+   - River data.
+   - Water-body data.
+   - Road-network data.
+4. Configure each fetcher with a source URL/API, query parameters, and licensing information.
+5. Trigger automatic fetching after DEM upload.
+6. Download or stream the relevant data for the DEM's region.
+7. Validate fetched data (format, CRS, extent).
+8. Reproject fetched data to a common analysis CRS.
+9. Cache fetched data locally with provenance metadata.
+10. Handle fetch failures gracefully (network errors, rate limits, empty results).
+11. Mark unavailable layers and disable their cost factors by default.
+12. Display fetch status and source per layer.
+13. Provide manual refresh for each fetched layer.
+14. Individual layer visibility.
+15. Layer opacity controls.
+16. Layer metadata inspection.
+17. CRS validation.
+18. Dataset extent validation.
+19. Coordinate reprojection.
+20. Initial raster/vector alignment.
+21. Layer removal.
+22. Layer status display.
 
 ### Completion criteria
 
-Multiple geographical datasets can be loaded and independently displayed in the correct geographical positions.
+After a DEM is uploaded, the application automatically retrieves the required supporting datasets (vegetation, land-cover, rivers, water bodies, roads) for its region, caches them with provenance metadata, and displays them as independently manageable layers on the map in correct geographical positions.
 
 ---
 
@@ -767,7 +835,7 @@ Multiple geographical datasets can be loaded and independently displayed in the 
 
 ### Objective
 
-Convert the geographical datasets into compatible cost layers and combine them.
+Convert the geographical datasets (uploaded DEM, fetched layers, derived layers) into compatible cost layers and combine them.
 
 ### Features
 
@@ -793,6 +861,7 @@ Convert the geographical datasets into compatible cost layers and combine them.
 20. Add colour legend.
 21. Add cost-layer visibility controls.
 22. Validate the output.
+23. Handle partial-coverage or missing fetched layers within the analysis region.
 
 ### Completion criteria
 
@@ -916,7 +985,7 @@ Provide a detailed 3D geographical representation.
 7. Render route geometry in 3D.
 8. Display start marker.
 9. Display destination marker.
-10. Display applicable geographical layers.
+10. Display applicable fetched geographical layers.
 11. Display geographical restrictions.
 12. Implement zoom.
 13. Implement rotation.
@@ -974,29 +1043,32 @@ Make the application reliable and ready for demonstration.
 2. Reopen projects.
 3. Store dataset metadata.
 4. Store dataset references.
-5. Store layer configuration.
-6. Store weight settings.
-7. Store selected points.
-8. Store geographical restrictions.
-9. Store generated route information.
-10. Export routes as GeoJSON.
-11. Export route statistics.
-12. Implement application-wide error handling.
-13. Test large raster datasets.
-14. Test different CRS systems.
-15. Test missing geospatial metadata.
-16. Test different raster resolutions.
-17. Test cost-map accuracy.
-18. Test routing correctness.
-19. Test alternative-route uniqueness.
-20. Test 2D and 3D visualisation.
-21. Test Linux compatibility.
-22. Test Windows compatibility.
-23. Optimise performance.
-24. Complete README.
-25. Complete architecture documentation.
-26. Prepare final demonstration.
-27. Prepare project presentation.
+5. Store fetch provenance and timestamps for auto-fetched layers.
+6. Store layer configuration.
+7. Store weight settings.
+8. Store selected points.
+9. Store geographical restrictions.
+10. Store generated route information.
+11. Refresh or re-fetch layers on project reopen.
+12. Export routes as GeoJSON.
+13. Export route statistics.
+14. Implement application-wide error handling.
+15. Test large raster datasets.
+16. Test different CRS systems.
+17. Test missing geospatial metadata.
+18. Test different raster resolutions.
+19. Test cost-map accuracy.
+20. Test routing correctness.
+21. Test alternative-route uniqueness.
+22. Test 2D and 3D visualisation.
+23. Test data-fetch failure and partial-coverage scenarios.
+24. Test Linux compatibility.
+25. Test Windows compatibility.
+26. Optimise performance.
+27. Complete README.
+28. Complete architecture documentation.
+29. Prepare final demonstration.
+30. Prepare project presentation.
 
 ### Completion criteria
 
@@ -1016,7 +1088,7 @@ The demonstration dataset should:
 - Have usable elevation values.
 - Be available in GeoTIFF format where possible.
 - Have a clear licence or permitted usage.
-- Be compatible with the supporting imagery source.
+- Be compatible with the supporting imagery and fetched-data sources.
 
 For a mountainous-region demonstration, select a suitable non-sensitive public dataset.
 
@@ -1026,6 +1098,8 @@ Potential data sources to investigate:
 - USGS EarthExplorer, where applicable.
 - OpenTopography, subject to dataset access and licence conditions.
 
+Supporting layers (vegetation, land-cover, rivers, water bodies, roads) will be fetched automatically from public sources for the demonstration region. The demonstration should document which sources were used and their licensing terms.
+
 Remember:
 
 DEM and satellite imagery are different datasets.
@@ -1034,21 +1108,26 @@ The DEM provides elevation and terrain geometry.
 
 Satellite or aerial imagery provides the visual surface.
 
+Fetched layers provide thematic information (land cover, hydrology, transport) but their accuracy and currency depend on the underlying source.
+
 The final demonstration should show:
 1. DEM upload.
 2. Automatic metadata recognition.
 3. Correct map positioning.
 4. Hillshade generation.
-5. Additional geographical layers.
-6. Cost-map generation.
-7. Dynamic cost configuration.
-8. Start and destination selection.
-9. Route calculation.
-10. Alternative routes.
-11. Route statistics.
-12. 2D and 3D visualisation.
+5. Automatic fetching of supporting layers for the DEM region.
+6. Layer management (visibility, opacity, refresh).
+7. Cost-map generation.
+8. Dynamic cost configuration.
+9. Start and destination selection.
+10. Route calculation.
+11. Alternative routes.
+12. Route statistics.
+13. 2D and 3D visualisation.
 
 Do not claim that a DEM has satellite-level visual detail by itself.
+
+Do not claim that automatically fetched layers are authoritative for safety-critical use.
 
 ---
 
@@ -1090,6 +1169,14 @@ terrain-route-planner/
                 vector_processing.py
                 hillshade.py
 
+            providers/
+                base.py
+                vegetation.py
+                landcover.py
+                hydrography.py
+                roads.py
+                cache.py
+
             cost/
                 normalization.py
                 cost_surface.py
@@ -1120,6 +1207,7 @@ terrain-route-planner/
 
     data/
         uploads/
+        fetched/
         processed/
         test_data/
 
@@ -1128,12 +1216,13 @@ terrain-route-planner/
         ARCHITECTURE.md
         IMPLEMENTATION_STATUS.md
         DATA_FORMATS.md
+        DATA_SOURCES.md
 
     environment.yml
     .gitignore
     README.md
 
-The exact directory structure can be adjusted as implementation progresses, but maintain clear separation between frontend, backend, geospatial processing, cost calculations and routing.
+The exact directory structure can be adjusted as implementation progresses, but maintain clear separation between frontend, backend, geospatial processing, data fetching, cost calculations and routing.
 
 ---
 
@@ -1191,6 +1280,7 @@ Update:
 - IMPLEMENTATION_STATUS.md
 - ARCHITECTURE.md, if architecture changes.
 - README.md, where appropriate.
+- DATA_SOURCES.md for any new or changed auto-fetch data provider.
 
 ### Step 6: Commit
 
@@ -1211,6 +1301,7 @@ Use:
 - Separate frontend and backend environments.
 - Environment variables for configurable paths and settings.
 - GitHub Actions for automated testing.
+- Cross-platform HTTP clients for data fetching.
 
 Avoid:
 - Hardcoded Linux paths.
@@ -1236,18 +1327,20 @@ Important requirements:
 2. Use raster windows and block-based processing where appropriate.
 3. Preserve source datasets.
 4. Cache derived layers when appropriate.
-5. Avoid regenerating unchanged cost layers.
-6. Recalculate only affected outputs when possible.
-7. Validate raster dimensions before processing.
-8. Display progress for long-running operations.
-9. Handle cancelled processing tasks.
-10. Handle insufficient memory and disk space gracefully.
-11. Avoid blocking the frontend while backend calculations run.
-12. Keep the UI responsive during processing.
-13. Use efficient route graph representations.
-14. Avoid unnecessarily expensive coordinate transformations.
+5. Cache automatically fetched datasets and reuse them across sessions where valid.
+6. Avoid regenerating unchanged cost layers.
+7. Recalculate only affected outputs when possible.
+8. Validate raster dimensions before processing.
+9. Display progress for long-running operations, including data fetching.
+10. Handle cancelled processing tasks and cancelled fetches.
+11. Handle insufficient memory and disk space gracefully.
+12. Avoid blocking the frontend while backend calculations or fetches run.
+13. Keep the UI responsive during processing and fetching.
+14. Use efficient route graph representations.
+15. Avoid unnecessarily expensive coordinate transformations.
+16. Respect rate limits of public data providers and avoid excessive repeated downloads.
 
-The system should report the analysis resolution and relevant dataset limitations to the user.
+The system should report the analysis resolution, data sources used, and relevant dataset limitations to the user.
 
 ---
 
@@ -1256,11 +1349,11 @@ The system should report the analysis resolution and relevant dataset limitation
 Suggested initial schedule:
 
 Week 1:
-- Phase 1.
-- Phase 2.
+- Phase 1 (complete).
+- Phase 2 (complete).
 
 Week 2:
-- Phase 3.
+- Phase 3 (automatic data fetching and layer management).
 
 Week 3:
 - Phase 4.
@@ -1296,8 +1389,8 @@ A user should be able to:
 3. Have the application inspect its geographical metadata.
 4. See the DEM correctly positioned on the world map.
 5. View its elevation and hillshade.
-6. Upload vegetation, land-cover, river, water-body and road datasets.
-7. Inspect and toggle individual layers.
+6. Have the application automatically fetch vegetation, land-cover, river, water-body and road datasets for the DEM's region.
+7. Inspect and toggle individual layers, and refresh auto-fetched layers.
 8. Generate individual cost layers.
 9. Combine them into a weighted cost map.
 10. Dynamically adjust cost weights.
@@ -1309,7 +1402,7 @@ A user should be able to:
 16. View elevation profiles.
 17. Switch between 2D and 3D.
 18. Inspect the route over detailed terrain and suitable imagery.
-19. Save and reopen projects.
+19. Save and reopen projects (with auto-fetched layers re-resolved or re-fetched).
 20. Export routes and results.
 
 The application must run on both Linux and Windows.
@@ -1326,15 +1419,20 @@ The application must run on both Linux and Windows.
 6. Test every phase.
 7. Maintain cross-platform compatibility.
 8. Document implementation decisions.
-9. Commit working milestones to GitHub.
-10. Never claim a feature works without testing it.
-11. Do not introduce unnecessary technologies.
-12. Do not implement future-phase functionality prematurely.
-13. Preserve all previously working functionality.
-14. Prefer reliable and understandable implementations over unnecessarily complicated algorithms.
+9. Document all automatic data sources, licensing, and limitations.
+10. Commit working milestones to GitHub.
+11. Never claim a feature works without testing it.
+12. Do not introduce unnecessary technologies.
+13. Do not implement future-phase functionality prematurely.
+14. Preserve all previously working functionality.
+15. Prefer reliable and understandable implementations over unnecessarily complicated algorithms.
 
-The first development milestone is:
+The first development milestone is complete:
 
 UPLOAD A GEOTIFF DEM → READ ITS METADATA → IDENTIFY ITS GEOGRAPHICAL COVERAGE → DISPLAY IT CORRECTLY ON THE 2D MAP → GENERATE AND DISPLAY HILLSHADE.
+
+The next milestone is:
+
+AUTOMATICALLY FETCH SUPPORTING LAYERS FOR THE DEM REGION → CACHE AND MANAGE THEM AS LAYERS → PREPARE THEM FOR COST-SURFACE GENERATION.
 
 Everything else should build on this working foundation.
